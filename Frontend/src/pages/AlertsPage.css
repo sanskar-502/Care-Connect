@@ -1,0 +1,255 @@
+/* ============================================================
+   Escalation Center (Alerts Phase) Image Match Styles
+   ============================================================ */
+
+.alerts-main {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 100px var(--space-xl) 80px;
+}
+
+/* Header */
+.alerts-header-img {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #1e293b;
+  padding-bottom: 16px;
+}
+.ah-titles h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 4px;
+}
+.ah-titles p {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+.ah-filters {
+  display: flex;
+  gap: 12px;
+}
+.ah-count {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border: 1px solid transparent;
+}
+.active-count {
+  background: #450a0a;
+  color: #ef4444;
+  border-color: #ef4444;
+}
+.resolved-count {
+  background: #172554;
+  color: #3b82f6;
+  border-color: #1e3a8a;
+}
+
+/* Accordion List */
+.alerts-accordion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.acc-card {
+  background: #0B1120;
+  border-radius: 8px;
+  border: 1px solid #1e293b;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+.acc-card.is-active:not(.expanded) {
+  border-color: #450a0a;
+}
+.acc-card.expanded {
+  border-color: #7f1d1d;
+}
+
+/* Header Row */
+.acc-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+.acc-header:hover {
+  background: rgba(255,255,255,0.02);
+}
+.acc-h-main {
+  display: flex;
+  gap: 12px;
+}
+.acc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 8px;
+}
+.dot-red {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+.dot-gray {
+  background: #475569;
+}
+.acc-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.acc-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: white;
+}
+.acc-resolved-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #16a34a;
+  background: #064e3b;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+.acc-msg {
+  font-size: 0.95rem;
+  color: #cbd5e1;
+  margin-bottom: 6px;
+}
+.acc-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.acc-chevron {
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* Body / Expanded */
+.acc-body {
+  padding: 0 16px 16px 36px;
+  border-top: 1px solid #1e293b;
+  margin-top: 8px;
+  padding-top: 16px;
+}
+.acc-body-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #06b6d4;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+/* Chat container */
+.acc-chat-container {
+  background: #0f172a;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.acc-bubble-wrapper {
+  display: flex;
+}
+.acc-bubble-wrapper.bot {
+  justify-content: flex-start;
+}
+.acc-bubble-wrapper.patient {
+  justify-content: flex-end;
+}
+
+.acc-bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bot .acc-bubble {
+  background: #1e293b;
+}
+.patient .acc-bubble {
+  background: #022c22;
+}
+
+.acc-bubble-sender {
+  font-size: 0.65rem;
+  color: #64748b;
+}
+.patient .acc-bubble-sender {
+  color: #22c55e;
+}
+.acc-bubble-text {
+  font-size: 0.9rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+.patient .acc-bubble-text {
+  color: #4ade80;
+}
+
+/* Phone and Actions */
+.acc-phone {
+  font-size: 0.85rem;
+  color: #475569;
+  margin-bottom: 16px;
+}
+.acc-phone span {
+  color: #06b6d4;
+  font-weight: 500;
+}
+
+.acc-actions {
+  display: flex;
+  gap: 12px;
+}
+.btn-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+.btn-mark-resolved {
+  background: #022c22;
+  color: #22c55e;
+  border-color: #064e3b;
+}
+.btn-mark-resolved:hover { background: #064e3b; }
+
+.btn-telehealth {
+  background: #083344;
+  color: #06b6d4;
+  border-color: #164e63;
+}
+.btn-telehealth:hover { background: #164e63; }
+
+.btn-call {
+  background: #0f172a;
+  color: #cbd5e1;
+  border-color: #1e293b;
+}
+.btn-call:hover { background: #1e293b; color: white; }

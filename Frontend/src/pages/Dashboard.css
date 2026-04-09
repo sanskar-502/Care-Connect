@@ -1,0 +1,264 @@
+/* ============================================================
+   Dashboard / Command Center Styles
+   ============================================================ */
+.dashboard-main {
+  padding: 80px var(--space-xl) var(--space-xl);
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* -- KPI Banner -- */
+.kpi-banner {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+.kpi-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
+}
+.kpi-card:hover {
+  border-color: var(--border-default);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.kpi-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+.kpi-data {
+  display: flex;
+  flex-direction: column;
+}
+.kpi-number {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.kpi-danger { color: var(--color-danger); }
+.kpi-warning { color: var(--color-warning); }
+.kpi-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* -- Triage Header -- */
+.triage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+.triage-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.triage-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* -- Table Container -- */
+.triage-table-container {
+  padding: 0;
+  overflow: hidden;
+}
+.triage-table-container .data-table thead th:first-child,
+.triage-table-container .data-table tbody td:first-child {
+  padding-left: var(--space-lg);
+}
+
+/* Patient cell in table */
+.patient-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.patient-avatar {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.patient-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+.patient-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.room-tag {
+  padding: 3px 10px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+
+.diagnosis-cell {
+  max-width: 200px;
+}
+
+/* Risk bar */
+.risk-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 150px;
+}
+.risk-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.risk-bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 1s ease-out;
+}
+.risk-bar.risk-danger { background: var(--gradient-danger); }
+.risk-bar.risk-warning { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.risk-bar.risk-success { background: var(--gradient-success); }
+
+.risk-score {
+  font-weight: 700;
+  font-size: 0.85rem;
+  min-width: 40px;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.risk-score.risk-danger { color: var(--color-danger); }
+.risk-score.risk-warning { color: var(--color-warning); }
+.risk-score.risk-success { color: var(--color-success); }
+
+/* Vitals mini */
+.vitals-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.view-xai-btn {
+  font-size: 0.8rem;
+  padding: 6px 14px;
+}
+
+/* -- Admit Modal -- */
+.admit-modal {
+  max-width: 900px;
+}
+.admit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.admit-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.admit-form {
+  padding: var(--space-xl);
+}
+.admit-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xl);
+}
+.admit-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+.form-group {
+  margin-bottom: var(--space-md);
+}
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+/* Upload zone */
+.upload-zone {
+  border: 2px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  text-align: center;
+  margin-bottom: var(--space-md);
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+.upload-zone:hover {
+  border-color: var(--accent-primary);
+  background: rgba(99, 102, 241, 0.03);
+}
+.upload-icon {
+  font-size: 2rem;
+  margin-bottom: var(--space-sm);
+}
+.upload-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.admit-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Spinner */
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}

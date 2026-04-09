@@ -1,0 +1,190 @@
+/* ============================================================
+   Analytics / ROI Dashboard - Image Match Styles
+   ============================================================ */
+
+.analytics-main {
+  padding: 100px var(--space-xl) var(--space-xl);
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.analytics-header {
+  margin-bottom: var(--space-lg);
+  position: relative;
+}
+.analytics-header h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.analytics-sub {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+.last-updated {
+  position: absolute;
+  top: 10px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* Row 1: KPIs */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.kpi-card {
+  border-radius: 12px;
+  padding: 24px;
+  position: relative;
+  border: 1px solid #1e293b;
+}
+
+/* The Green Penalty Avoidance Card */
+.banner-green {
+  background: #022c22; /* Very dark green */
+  border-color: #064e3b;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.bg-dollar {
+  position: absolute;
+  right: 30px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 4rem;
+  font-weight: 400;
+  color: #22c55e;
+  opacity: 0.9;
+}
+.kpi-title-green {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #22c55e;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.kpi-value-huge {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: white;
+  line-height: 1;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+
+/* Standard Dark Cards */
+.standard-dark {
+  background: #0f172a; /* Dark sleek blue */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.kpi-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+}
+.kpi-value {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: white;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.kpi-sub-green {
+  font-size: 0.85rem;
+  color: #22c55e;
+}
+.kpi-sub-cyan {
+  font-size: 0.85rem;
+  color: #06b6d4;
+}
+
+/* Row 2: Charts */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.chart-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 24px;
+}
+.chart-header {
+  margin-bottom: 24px;
+}
+.chart-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.chart-header p {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* Row 3: Model Metrics */
+.model-panel {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 24px;
+}
+.model-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.model-header h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+.metric-box {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 16px;
+}
+.metric-title {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+.metric-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #22c55e;
+  margin-bottom: 8px;
+}
+.metric-sub {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .charts-grid { grid-template-columns: 1fr; }
+  .metrics-grid { grid-template-columns: 1fr 1fr; }
+}
