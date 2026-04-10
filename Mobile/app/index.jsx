@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Colors from '../constants/Colors';
 import { ShieldAlert, User, Stethoscope } from 'lucide-react-native';
