@@ -1,0 +1,29 @@
+# ============================================================
+# CareConnect — AI Engine Dependencies
+# Python 3.10+
+# ============================================================
+
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# AI / LLM
+langchain==0.2.16
+langchain-google-genai==1.0.10
+langchain-community==0.2.16
+
+# MongoDB
+pymongo==4.8.0
+
+# Data Validation
+pydantic==2.9.0
+pydantic-settings==2.4.0
+
+# HTTP Client (for Databricks)
+requests==2.32.3
+
+# Environment Variables
+python-dotenv==1.0.1
+
+# CORS
+starlette==0.38.5

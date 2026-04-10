@@ -103,6 +103,11 @@ export default function PatientDetail() {
             <RAGCopilot patientName={patient.name} />
           </div>
         </div>
+
+        {/* Vitals Trend Section */}
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.4s', marginTop: 'var(--space-lg)' }}>
+          <VitalsTrendChart history={patient.vitalHistory} diagnosis={patient.primaryDiagnosis} />
+        </div>
       </main>
 
       {showDischarge && (
@@ -113,6 +118,245 @@ export default function PatientDetail() {
 }
 
 /* ============ Sub-Components ============ */
+
+// ---- Vitals Trend Chart (pure SVG, no external library) ----
+const METRICS = [
+  {
+    key: 'sugar',
+    label: 'Blood Sugar',
+    unit: 'mg/dL',
+    color: '#f59e0b',
+    refLow: 70, refHigh: 140,
+    icon: '🩸',
+  },
+  {
+    key: 'bpSys',
+    label: 'BP (Systolic)',
+    unit: 'mmHg',
+    color: '#ef4444',
+    refLow: 90, refHigh: 130,
+    icon: '💓',
+  },
+  {
+    key: 'hr',
+    label: 'Heart Rate',
+    unit: 'bpm',
+    color: '#6366f1',
+    refLow: 60, refHigh: 100,
+    icon: '❤️',
+  },
+  {
+    key: 'spo2',
+    label: 'SpO₂',
+    unit: '%',
+    color: '#22c55e',
+    refLow: 95, refHigh: 100,
+    icon: '🫁',
+  },
+];
+
+function VitalsTrendChart({ history = [], diagnosis }) {
+  const [activeMetric, setActiveMetric] = useState(0);
+  const [tooltip, setTooltip] = useState(null);
+  const [animated, setAnimated] = useState(false);
+  const svgRef = useRef(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimated(true), 100);
+    return () => clearTimeout(timer);
+  }, [activeMetric]);
+
+  useEffect(() => {
+    setAnimated(false);
+  }, [activeMetric]);
+
+  const metric = METRICS[activeMetric];
+  const values = history.map((d) => d[metric.key]);
+  const days   = history.map((d) => d.day);
+
+  // Chart dimensions
+  const W = 900, H = 200, PAD_L = 52, PAD_R = 20, PAD_T = 20, PAD_B = 40;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+
+  const minVal = Math.min(...values, metric.refLow) - 5;
+  const maxVal = Math.max(...values, metric.refHigh) + 5;
+  const range  = maxVal - minVal || 1;
+
+  const toX = (i) => PAD_L + (i / (values.length - 1)) * chartW;
+  const toY = (v) => PAD_T + chartH - ((v - minVal) / range) * chartH;
+
+  const polyPoints = values.map((v, i) => `${toX(i)},${toY(v)}`).join(' ');
+  const fillPoints = [
+    `${toX(0)},${H - PAD_B}`,
+    ...values.map((v, i) => `${toX(i)},${toY(v)}`),
+    `${toX(values.length - 1)},${H - PAD_B}`,
+  ].join(' ');
+
+  // Y-axis ticks
+  const tickCount = 5;
+  const yTicks = Array.from({ length: tickCount }, (_, i) => {
+    const val = minVal + (range / (tickCount - 1)) * i;
+    return { val: Math.round(val), y: toY(val) };
+  });
+
+  // Latest value stats
+  const latest   = values[values.length - 1];
+  const previous = values[values.length - 2];
+  const delta    = latest - previous;
+  const inRange  = latest >= metric.refLow && latest <= metric.refHigh;
+
+  return (
+    <div className="card vitals-chart-card">
+      {/* Header */}
+      <div className="vc-header">
+        <div>
+          <h3 className="section-label" style={{ margin: 0 }}>📈 Vitals Trend — Last 7 Days</h3>
+          <p className="vc-sub">{diagnosis}</p>
+        </div>
+        <div className="vc-latest">
+          <span className="vc-latest-val" style={{ color: metric.color }}>{latest} {metric.unit}</span>
+          <span className={`vc-delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'neutral'}`}>
+            {delta > 0 ? '↑' : delta < 0 ? '↓' : '→'} {Math.abs(delta) > 0 ? Math.abs(delta) : '0'}
+          </span>
+          <span className={`pill ${inRange ? 'pill-success' : 'pill-danger'}`}>
+            {inRange ? 'Normal' : 'Out of Range'}
+          </span>
+        </div>
+      </div>
+
+      {/* Metric Tabs */}
+      <div className="vc-tabs">
+        {METRICS.map((m, i) => (
+          <button
+            key={m.key}
+            className={`vc-tab ${i === activeMetric ? 'active' : ''}`}
+            style={i === activeMetric ? { borderColor: m.color, color: m.color } : {}}
+            onClick={() => setActiveMetric(i)}
+            id={`vital-tab-${m.key}`}
+          >
+            <span>{m.icon}</span>
+            <span>{m.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* SVG Chart */}
+      <div className="vc-svg-wrapper" onMouseLeave={() => setTooltip(null)}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          className="vc-svg"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Grid lines */}
+          {yTicks.map((t) => (
+            <g key={t.val}>
+              <line x1={PAD_L} y1={t.y} x2={W - PAD_R} y2={t.y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+              <text x={PAD_L - 6} y={t.y + 4} fill="rgba(255,255,255,0.35)" fontSize="11" textAnchor="end">{t.val}</text>
+            </g>
+          ))}
+
+          {/* X-axis labels */}
+          {days.map((d, i) => (
+            <text key={d} x={toX(i)} y={H - PAD_B + 20} fill="rgba(255,255,255,0.45)" fontSize="11" textAnchor="middle">{d}</text>
+          ))}
+
+          {/* Reference band */}
+          <rect
+            x={PAD_L} y={toY(metric.refHigh)}
+            width={chartW} height={toY(metric.refLow) - toY(metric.refHigh)}
+            fill={`${metric.color}12`}
+            rx="2"
+          />
+          {/* Ref lines */}
+          <line x1={PAD_L} y1={toY(metric.refHigh)} x2={W - PAD_R} y2={toY(metric.refHigh)} stroke={`${metric.color}50`} strokeWidth="1" strokeDasharray="4 4" />
+          <line x1={PAD_L} y1={toY(metric.refLow)}  x2={W - PAD_R} y2={toY(metric.refLow)}  stroke={`${metric.color}50`} strokeWidth="1" strokeDasharray="4 4" />
+          <text x={W - PAD_R + 2} y={toY(metric.refHigh) + 4} fill={`${metric.color}90`} fontSize="10">max</text>
+          <text x={W - PAD_R + 2} y={toY(metric.refLow)  + 4} fill={`${metric.color}90`} fontSize="10">min</text>
+
+          {/* Area fill */}
+          <polygon
+            points={fillPoints}
+            fill={`${metric.color}18`}
+            style={{ transition: 'all 0.6s ease' }}
+          />
+
+          {/* Line */}
+          <polyline
+            points={polyPoints}
+            fill="none"
+            stroke={metric.color}
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{
+              strokeDasharray: 1200,
+              strokeDashoffset: animated ? 0 : 1200,
+              transition: 'stroke-dashoffset 1s ease-out',
+            }}
+          />
+
+          {/* Data points + hover targets */}
+          {values.map((v, i) => (
+            <g key={i}>
+              <circle
+                cx={toX(i)} cy={toY(v)} r="5"
+                fill={metric.color} stroke="var(--bg-surface)" strokeWidth="2"
+                style={{ opacity: animated ? 1 : 0, transition: `opacity 0.3s ease ${0.6 + i * 0.04}s` }}
+              />
+              {/* invisible hit target */}
+              <circle
+                cx={toX(i)} cy={toY(v)} r="18"
+                fill="transparent"
+                style={{ cursor: 'crosshair' }}
+                onMouseEnter={(e) => {
+                  const rect = svgRef.current?.getBoundingClientRect();
+                  const svgX = e.clientX - (rect?.left || 0);
+                  const svgY = e.clientY - (rect?.top  || 0);
+                  setTooltip({ x: svgX, y: svgY, day: days[i], val: v, i });
+                }}
+              />
+            </g>
+          ))}
+        </svg>
+
+        {/* Tooltip */}
+        {tooltip && (
+          <div
+            className="vc-tooltip"
+            style={{
+              left: Math.min(tooltip.x + 12, 700),
+              top:  Math.max(tooltip.y - 40, 4),
+            }}
+          >
+            <span className="vc-tt-day">{tooltip.day}</span>
+            <span className="vc-tt-val" style={{ color: metric.color }}>
+              {tooltip.val} {metric.unit}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Mini stat cards */}
+      <div className="vc-stats">
+        {[
+          { label: 'Latest',  val: `${values[values.length-1]} ${metric.unit}` },
+          { label: 'Highest', val: `${Math.max(...values)} ${metric.unit}` },
+          { label: 'Lowest',  val: `${Math.min(...values)} ${metric.unit}` },
+          { label: 'Avg',     val: `${Math.round(values.reduce((a,b)=>a+b,0)/values.length)} ${metric.unit}` },
+          { label: 'Normal Range', val: `${metric.refLow}–${metric.refHigh} ${metric.unit}` },
+        ].map((s) => (
+          <div key={s.label} className="vc-stat">
+            <span className="vc-stat-label">{s.label}</span>
+            <span className="vc-stat-val">{s.val}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 function ClinicalHistory({ notes }) {
   const typeColors = { admission: 'info', dictation: 'warning', discharge: 'success' };
@@ -144,16 +388,13 @@ function DictationHub() {
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [saved, setSaved] = useState(false);
   const recognitionRef = useRef(null);
 
   const toggleRecording = () => {
     if (recording) {
       recognitionRef.current?.stop();
       setRecording(false);
-      if (transcript.trim()) {
-        setAnalyzing(true);
-        setTimeout(() => setAnalyzing(false), 2000);
-      }
     } else {
       try {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -173,20 +414,53 @@ function DictationHub() {
         recognition.start();
         setRecording(true);
         setTranscript('');
+        setSaved(false);
       } catch {
         setTranscript('Speech recognition not available in this browser. Try Chrome.');
       }
     }
   };
 
+  const handleSaveNote = async () => {
+    if (!transcript.trim()) return;
+    setAnalyzing(true);
+    
+    try {
+      // POST to our real Node.js Backend -> Python AI Engine
+      const res = await fetch('http://localhost:5000/api/data/dictation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: "69d8e00c1228569c07a2c636", // Fallback seeded ID for demo
+          rawText: transcript
+        })
+      });
+      const data = await res.json();
+      console.log('AI Extraction Success:', data);
+    } catch (err) {
+      console.error('AI Extraction Failed:', err);
+    } finally {
+      setAnalyzing(false);
+      setSaved(true);
+    }
+  };
+
+  const handleClear = () => {
+    setTranscript('');
+    setSaved(false);
+  };
+
   return (
     <div className="card dictation-card">
       <h3 className="section-label">🎤 Ambient Dictation Hub</h3>
+
+      {/* Voice mic button */}
       <div className="dic-center">
         <button
           className={`dic-mic ${recording ? 'recording' : ''}`}
           onClick={toggleRecording}
           id="dictation-mic-btn"
+          title={recording ? 'Stop recording' : 'Start voice dictation'}
         >
           {recording && <span className="dic-pulse" />}
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -196,17 +470,44 @@ function DictationHub() {
             <line x1="8" y1="23" x2="16" y2="23"/>
           </svg>
         </button>
-        <p className="dic-hint">{recording ? 'Listening... Click to stop' : 'Click to start dictation'}</p>
+        <p className="dic-hint">{recording ? 'Listening… Click to stop' : 'Click mic to dictate'}</p>
       </div>
-      {transcript && (
-        <div className="dic-transcript">
-          <p>{transcript}</p>
+
+      {/* Or divider */}
+      <div className="dic-divider"><span>or type below</span></div>
+
+      {/* Text input area */}
+      <textarea
+        className="textarea dic-textarea"
+        placeholder="Type your clinical note here…"
+        value={transcript}
+        onChange={(e) => { setTranscript(e.target.value); setSaved(false); }}
+        rows={4}
+        id="dictation-text-input"
+        disabled={recording}
+      />
+
+      {/* Action row */}
+      {transcript.trim() && !recording && (
+        <div className="dic-actions">
+          <button className="btn btn-ghost btn-sm" onClick={handleClear} id="dictation-clear-btn">
+            🗑 Clear
+          </button>
+          <button
+            className={`btn btn-sm ${saved ? 'btn-success' : 'btn-primary'}`}
+            onClick={handleSaveNote}
+            id="dictation-save-btn"
+            disabled={saved}
+          >
+            {saved ? '✅ Note Saved' : '💾 Save Note'}
+          </button>
         </div>
       )}
+
       {analyzing && (
         <div className="dic-analyzing">
           <span className="spinner" style={{ width: 14, height: 14 }} />
-          Analyzing intent... Updating status tag
+          Analyzing intent… Updating status tag
         </div>
       )}
     </div>

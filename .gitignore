@@ -26,3 +26,9 @@ dist-ssr
 # Project-specific ignore files
 /PROJECT_SUMMARY.md
 /whatIhavetoadd.txt
+Temp_readme.md
+Technical_summary.md
+
+# Secrets and Keys
+.env
+.env.*

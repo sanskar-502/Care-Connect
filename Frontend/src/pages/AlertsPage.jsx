@@ -1,11 +1,53 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-import { alerts } from '../data/mockData';
+import { getAlerts, resolveAlert } from '../services/api';
+import { io } from 'socket.io-client';
 import './AlertsPage.css';
 
 export default function AlertsPage() {
-  const [alertList, setAlertList] = useState(alerts);
-  const [expandedId, setExpandedId] = useState('alert-1'); // Default expand first one
+  const [alertList, setAlertList] = useState([]);
+  const [expandedId, setExpandedId] = useState(null); 
+  const [loading, setLoading] = useState(true);
+
+  // Fetch alerts from backend API
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const data = await getAlerts();
+        setAlertList(data || []);
+        if (data && data.length > 0) setExpandedId(data[0]._id);
+      } catch (err) {
+        console.error("Failed to fetch alerts", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAlerts();
+
+    // Listen for Webhook alerts dynamically via socket.io
+    const socket = io('http://localhost:5000');
+    
+    socket.on('critical_alert', (newAlert) => {
+      console.log('🚨 Received realtime alert:', newAlert);
+      setAlertList(prev => [
+        {
+          _id: newAlert.alertId,
+          patientId: { name: newAlert.patientName, phone: newAlert.phone || '--' },
+          alertType: newAlert.alertType,
+          message: newAlert.message,
+          resolved: false,
+          timestamp: newAlert.timestamp
+        },
+        ...prev
+      ]);
+    });
+
+    socket.on('alert_resolved', (payload) => {
+      setAlertList(prev => prev.map(a => a._id === payload.alertId ? { ...a, resolved: true } : a));
+    });
+
+    return () => socket.disconnect();
+  }, []);
 
   const activeCount = alertList.filter((a) => !a.resolved).length;
   const resolvedCount = alertList.filter((a) => a.resolved).length;
@@ -14,10 +56,14 @@ export default function AlertsPage() {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const resolveAlert = (id, e) => {
-    e.stopPropagation(); // prevent accordion toggle
-    setAlertList((prev) => prev.map((a) => a.id === id ? { ...a, resolved: true } : a));
-    // Optionally close it or leave it open
+  const handleResolve = async (id, e) => {
+    e.stopPropagation(); 
+    try {
+      await resolveAlert(id);
+      setAlertList((prev) => prev.map((a) => a._id === id ? { ...a, resolved: true } : a));
+    } catch (err) {
+      console.error("Failed to resolve alert", err);
+    }
   };
 
   return (
@@ -45,22 +91,26 @@ export default function AlertsPage() {
 
         {/* Accordion List */}
         <div className="alerts-accordion-list stagger">
-          {alertList.map((alert) => {
-            const isExpanded = expandedId === alert.id;
+          {loading ? (
+            <div style={{ color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '40px' }}>Loading real-time alerts...</div>
+          ) : alertList.map((alert) => {
+            const isExpanded = expandedId === alert._id;
             const isResolved = alert.resolved;
+            const patientName = alert.patientId?.name || "Unknown Patient";
+            const patientPhone = alert.patientId?.phone || "--";
 
             return (
               <div 
-                key={alert.id} 
+                key={alert._id} 
                 className={`acc-card ${isExpanded ? 'expanded' : ''} ${isResolved ? 'is-resolved' : 'is-active'}`}
               >
                 {/* Card Header (always visible) */}
-                <div className="acc-header" onClick={() => toggleExpand(alert.id)}>
+                <div className="acc-header" onClick={() => toggleExpand(alert._id)}>
                   <div className="acc-h-main">
                     <div className={`acc-dot ${isResolved ? 'dot-gray' : 'dot-red'}`} />
                     <div className="acc-h-content">
                       <div className="acc-name-row">
-                        <span className="acc-name">{alert.patientName}</span>
+                        <span className="acc-name">{patientName}</span>
                         {isResolved && <span className="acc-resolved-pill">Resolved</span>}
                       </div>
                       <div className="acc-msg">{alert.message}</div>
@@ -84,29 +134,25 @@ export default function AlertsPage() {
                   <div className="acc-body animate-fade-in">
                     <div className="acc-body-title">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                      WHATSAPP CHAT HISTORY
+                      {alert.alertType === 'WhatsApp' ? 'WHATSAPP CHAT ALERT' : 'CRITICAL VITAL ALERT'}
                     </div>
                     
                     <div className="acc-chat-container">
-                      {alert.whatsappHistory.map((msg, i) => (
-                        <div key={i} className={`acc-bubble-wrapper ${msg.from === 'bot' ? 'bot' : 'patient'}`}>
-                          <div className="acc-bubble">
-                            <span className="acc-bubble-sender">
-                              {msg.from === 'bot' ? 'CareConnect Bot' : alert.patientName}
-                            </span>
-                            <div className="acc-bubble-text">{msg.text}</div>
-                          </div>
+                      <div className="acc-bubble-wrapper patient">
+                        <div className="acc-bubble">
+                          <span className="acc-bubble-sender">{patientName}</span>
+                          <div className="acc-bubble-text">{alert.message}</div>
                         </div>
-                      ))}
+                      </div>
                     </div>
 
                     <div className="acc-phone">
-                      Patient phone: <span>{alert.phone}</span>
+                      Patient phone: <span>{patientPhone}</span>
                     </div>
 
                     {!isResolved && (
                       <div className="acc-actions">
-                        <button className="btn-alert btn-mark-resolved" onClick={(e) => resolveAlert(alert.id, e)}>
+                        <button className="btn-alert btn-mark-resolved" onClick={(e) => handleResolve(alert._id, e)}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                           Mark Resolved
                         </button>
@@ -133,11 +179,12 @@ export default function AlertsPage() {
 
 // Helper to fake a readable relative time from mock timestamp
 function formatTimeAgo(ts) {
+  if (!ts) return '';
   const d = new Date(ts);
   const now = new Date();
-  const diffHours = (now - d) / (1000 * 60 * 60);
-  if (diffHours < 1) return '14 minutes ago'; // Force match the image for the demo
-  if (diffHours < 5) return '2 hours ago';
-  if (diffHours < 24) return '5 hours ago';
-  return '1 day ago';
+  const diffHours = Math.abs(now - d) / (1000 * 60 * 60);
+  
+  if (diffHours < 1) return '0 hours ago';
+  if (diffHours < 24) return `${Math.floor(diffHours)} hours ago`;
+  return `${Math.floor(diffHours / 24)} days ago`;
 }

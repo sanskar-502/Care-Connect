@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { patients } from '../data/mockData';
+import { getPatients } from '../services/api';
+import { io } from 'socket.io-client';
 import './Dashboard.css';
 
 const getRiskColor = (score) => {
@@ -22,12 +23,45 @@ const getStatusInfo = (status) => {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [showAdmit, setShowAdmit] = useState(false);
-  const [sortedPatients] = useState(
-    [...patients].sort((a, b) => b.riskScore - a.riskScore)
-  );
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const highRisk = patients.filter((p) => p.riskScore >= 70).length;
-  const pending = patients.filter((p) => p.status === 'Stable').length;
+  // Fetch patients on mount
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const data = await getPatients();
+        // Sort highest risk first
+        setPatients(data.sort((a, b) => b.currentRiskScore - a.currentRiskScore));
+      } catch (err) {
+        console.error("Failed to fetch patients", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPatients();
+
+    // Socket.io for Real-time Dashboard Updates
+    const socket = io('http://localhost:5000');
+    
+    socket.on('vitals_updated', (payload) => {
+      console.log('Real-time update:', payload);
+      setPatients(prev => {
+        const newPatients = prev.map(p => {
+          if (p._id === payload.patientId) {
+            return { ...p, currentRiskScore: payload.newRiskScore };
+          }
+          return p;
+        });
+        return newPatients.sort((a, b) => b.currentRiskScore - a.currentRiskScore);
+      });
+    });
+
+    return () => socket.disconnect();
+  }, []);
+
+  const highRisk = patients.filter((p) => p.currentRiskScore >= 70).length;
+  const pending = patients.filter((p) => p.currentRiskScore < 70).length;
 
   return (
     <div className="page-wrapper">
@@ -80,74 +114,81 @@ export default function Dashboard() {
 
         {/* Triage Table */}
         <div className="triage-table-container card">
-          <table className="data-table" id="triage-table">
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Room</th>
-                <th>Primary Diagnosis</th>
-                <th>Readmission Risk</th>
-                <th>Status</th>
-                <th>Vitals</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody className="stagger">
-              {sortedPatients.map((patient) => {
-                const riskColor = getRiskColor(patient.riskScore);
-                const statusInfo = getStatusInfo(patient.status);
-                return (
-                  <tr key={patient.id} className="triage-row">
-                    <td>
-                      <div className="patient-cell">
-                        <div className="patient-avatar" style={{
-                          background: patient.riskScore >= 70 ? 'var(--color-danger-soft)' : 'var(--accent-primary-glow)',
-                          color: patient.riskScore >= 70 ? 'var(--color-danger)' : 'var(--accent-primary)'
-                        }}>
-                          {patient.name.split(' ').map(n => n[0]).join('')}
+          {loading ? (
+             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+               Loading patient records from Backend API...
+             </div>
+          ) : (
+            <table className="data-table" id="triage-table">
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>Contact</th>
+                  <th>Condition Status</th>
+                  <th>Readmission Risk</th>
+                  <th>Status</th>
+                  <th>Medications</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody className="stagger">
+                {patients.map((patient) => {
+                  const riskColor = getRiskColor(patient.currentRiskScore);
+                  // Determine status string based on risk
+                  const statusStr = patient.currentRiskScore >= 70 ? 'Declining' : 'Stable';
+                  const statusInfo = getStatusInfo(statusStr);
+                  return (
+                    <tr key={patient._id} className="triage-row">
+                      <td>
+                        <div className="patient-cell">
+                          <div className="patient-avatar" style={{
+                            background: patient.currentRiskScore >= 70 ? 'var(--color-danger-soft)' : 'var(--accent-primary-glow)',
+                            color: patient.currentRiskScore >= 70 ? 'var(--color-danger)' : 'var(--accent-primary)'
+                          }}>
+                            {patient.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div>
+                            <div className="patient-name">{patient.name}</div>
+                            <div className="patient-meta">{patient.age}y</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="patient-name">{patient.name}</div>
-                          <div className="patient-meta">{patient.age}y • {patient.gender}</div>
+                      </td>
+                      <td><span className="room-tag">{patient.phone}</span></td>
+                      <td className="diagnosis-cell">Admitted</td>
+                      <td>
+                        <div className="risk-cell">
+                          <div className="risk-bar-bg">
+                            <div className={`risk-bar risk-${riskColor}`} style={{ width: `${patient.currentRiskScore}%` }} />
+                          </div>
+                          <span className={`risk-score risk-${riskColor}`}>{patient.currentRiskScore}%</span>
                         </div>
-                      </div>
-                    </td>
-                    <td><span className="room-tag">{patient.room}</span></td>
-                    <td className="diagnosis-cell">{patient.primaryDiagnosis}</td>
-                    <td>
-                      <div className="risk-cell">
-                        <div className="risk-bar-bg">
-                          <div className={`risk-bar risk-${riskColor}`} style={{ width: `${patient.riskScore}%` }} />
+                      </td>
+                      <td>
+                        <span className={`pill pill-${statusInfo.color}`}>
+                          {statusInfo.icon} {statusStr}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="vitals-mini">
+                          <span>{patient.currentMedications?.length || 0} Meds</span>
                         </div>
-                        <span className={`risk-score risk-${riskColor}`}>{patient.riskScore}%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`pill pill-${statusInfo.color}`}>
-                        {statusInfo.icon} {patient.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="vitals-mini">
-                        <span>♥ {patient.vitals.hr}</span>
-                        <span>BP {patient.vitals.bp}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-ghost view-xai-btn"
-                        onClick={() => navigate(`/patient/${patient.id}`)}
-                        id={`view-xai-${patient.id}`}
-                      >
-                        View XAI
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-ghost view-xai-btn"
+                          onClick={() => navigate(`/patient/${patient._id}`)}
+                          id={`view-xai-${patient._id}`}
+                        >
+                          View XAI
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </main>
 
@@ -182,74 +223,14 @@ function AdmitModal({ onClose }) {
           <div className="admit-split">
             {/* Left: Structured Data */}
             <div className="admit-left">
-              <h3 className="admit-section-title">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>
-                Structured Data
-              </h3>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Patient Name</label>
-                  <input className="input" placeholder="Full name" defaultValue="John Doe" />
-                </div>
-                <div className="form-group">
-                  <label>Age</label>
-                  <input className="input" type="number" placeholder="Age" defaultValue="67" />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Contact Number</label>
-                  <input className="input" type="tel" placeholder="(555) 000-0000" defaultValue="(555) 123-4567" />
-                </div>
-                <div className="form-group">
-                  <label>Emergency Contact</label>
-                  <input className="input" type="tel" placeholder="(555) 000-0000" defaultValue="(555) 987-6543" />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Gender</label>
-                  <select className="select" defaultValue="Male">
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Blood Type</label>
-                  <select className="select" defaultValue="A+">
-                    <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
-                    <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Blood Pressure</label>
-                  <input className="input" placeholder="e.g. 140/90" defaultValue="142/88" />
-                </div>
-                <div className="form-group">
-                  <label>Heart Rate</label>
-                  <input className="input" type="number" placeholder="BPM" defaultValue="88" />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Primary Diagnosis</label>
-                <select className="select" defaultValue="Congestive Heart Failure">
-                  <option>Congestive Heart Failure</option>
-                  <option>Type 2 Diabetes</option>
-                  <option>COPD</option>
-                  <option>Pneumonia</option>
-                  <option>Acute Pancreatitis</option>
-                  <option>Atrial Fibrillation</option>
-                  <option>Post-Surgical Recovery</option>
-                </select>
-              </div>
+               <p style={{color: 'white', marginBottom: '1rem'}}>
+                 Admitting new patients via UI takes data and sends it to `POST /api/patients`. 
+                 (Wired in future sprints, currently using seed data).
+               </p>
+               <div className="form-group">
+                 <label>Patient Name</label>
+                 <input className="input" placeholder="Full name" defaultValue="John Doe" />
+               </div>
             </div>
 
             {/* Right: Unstructured Data */}
@@ -258,23 +239,13 @@ function AdmitModal({ onClose }) {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                 Unstructured Data
               </h3>
-
-              {/* Upload Zone */}
-              <div className="upload-zone">
-                <div className="upload-icon">📄</div>
-                <p><strong>Drop lab reports here</strong></p>
-                <p className="upload-hint">PDF, PNG, JPG — OCR extraction enabled</p>
-                <button type="button" className="btn btn-ghost" style={{ marginTop: '8px' }}>Browse Files</button>
-              </div>
-
-              {/* Physician Notes */}
               <div className="form-group">
                 <label>Admitting Physician&apos;s Notes</label>
                 <textarea
                   className="textarea"
                   rows="8"
                   placeholder="Paste clinical notes here..."
-                  defaultValue="Patient presents with worsening dyspnea over last 3 days. Reports non-compliance with prescribed diuretics. Living alone, limited family support. Previously hospitalized Nov 2025 for same condition. Notable confusion during initial assessment — possible early cognitive decline. Recommend social work consult."
+                  defaultValue="Patient presents with worsening dyspnea."
                 />
               </div>
             </div>
@@ -283,17 +254,7 @@ function AdmitModal({ onClose }) {
           <div className="admit-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary btn-lg" disabled={loading} id="run-assessment-btn">
-              {loading ? (
-                <>
-                  <span className="spinner" />
-                  Running AI Assessment...
-                </>
-              ) : (
-                <>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
-                  Run Initial Assessment
-                </>
-              )}
+              {loading ? <span className="spinner" /> : "Run Initial Assessment"}
             </button>
           </div>
         </form>

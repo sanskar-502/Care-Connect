@@ -7,9 +7,24 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Directory for testing
+coverage/
+
+# Dependencies
+node_modules/
+
+# Production build output
+dist/
+dist-ssr/
+
+# Environment configurations
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vite / React Specific
 *.local
 
 # Editor directories and files
@@ -22,7 +37,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Project-specific ignore files
-/PROJECT_SUMMARY.md
-/whatIhavetoadd.txt
