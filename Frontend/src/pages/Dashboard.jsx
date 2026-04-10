@@ -37,7 +37,7 @@ export default function Dashboard() {
         <div className="kpi-banner stagger">
           <div className="kpi-card">
             <div className="kpi-icon" style={{ background: 'var(--color-info-soft)', color: 'var(--color-info)' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             </div>
             <div className="kpi-data">
               <span className="kpi-number">{patients.length}</span>
@@ -47,7 +47,7 @@ export default function Dashboard() {
 
           <div className="kpi-card">
             <div className="kpi-icon" style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
             </div>
             <div className="kpi-data">
               <span className="kpi-number kpi-danger">{highRisk}</span>
@@ -57,7 +57,7 @@ export default function Dashboard() {
 
           <div className="kpi-card">
             <div className="kpi-icon" style={{ background: 'var(--color-warning-soft)', color: 'var(--color-warning)' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             </div>
             <div className="kpi-data">
               <span className="kpi-number kpi-warning">{pending}</span>
@@ -73,7 +73,7 @@ export default function Dashboard() {
             <p className="triage-sub">Sorted by highest readmission risk</p>
           </div>
           <button className="btn btn-primary" onClick={() => setShowAdmit(true)} id="admit-patient-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             Admit Patient
           </button>
         </div>
@@ -140,7 +140,7 @@ export default function Dashboard() {
                         id={`view-xai-${patient.id}`}
                       >
                         View XAI
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                       </button>
                     </td>
                   </tr>
@@ -183,7 +183,7 @@ function AdmitModal({ onClose }) {
             {/* Left: Structured Data */}
             <div className="admit-left">
               <h3 className="admit-section-title">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>
                 Structured Data
               </h3>
 
@@ -195,6 +195,17 @@ function AdmitModal({ onClose }) {
                 <div className="form-group">
                   <label>Age</label>
                   <input className="input" type="number" placeholder="Age" defaultValue="67" />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Contact Number</label>
+                  <input className="input" type="tel" placeholder="(555) 000-0000" defaultValue="(555) 123-4567" />
+                </div>
+                <div className="form-group">
+                  <label>Emergency Contact</label>
+                  <input className="input" type="tel" placeholder="(555) 000-0000" defaultValue="(555) 987-6543" />
                 </div>
               </div>
 
@@ -244,7 +255,7 @@ function AdmitModal({ onClose }) {
             {/* Right: Unstructured Data */}
             <div className="admit-right">
               <h3 className="admit-section-title">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                 Unstructured Data
               </h3>
 
@@ -279,7 +290,7 @@ function AdmitModal({ onClose }) {
                 </>
               ) : (
                 <>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
                   Run Initial Assessment
                 </>
               )}

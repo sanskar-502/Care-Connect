@@ -516,11 +516,7 @@ export default function LandingPage() {
         <div className="footer-inner">
           <div className="footer-brand">
             <div className="nav-logo">
-              <div className="logo-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                </svg>
-              </div>
+              <img src="/assets/logo.png" alt="CareConnect Logo" className="img-logo" />
               <span className="logo-text" style={{ fontSize: '1rem' }}>CareConnect</span>
             </div>
             <p className="footer-desc">Multi-Modal Readmission Intelligence Platform</p>

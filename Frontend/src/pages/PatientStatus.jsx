@@ -59,7 +59,7 @@ export default function PatientStatus() {
         <div className="ps-top-bar">
           <button className="back-btn-subtle" onClick={() => navigate('/')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
+              <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
             Back to Demo
           </button>
@@ -94,65 +94,76 @@ export default function PatientStatus() {
 
         {/* Responsive Grid Layout for Content */}
         <div className="ps-content-grid">
-          
+
           {/* Left Column */}
           <div className="ps-col-left">
             {/* Medications */}
-        <div className="ps-section">
-          <h2 className="ps-section-title">💊 Today&apos;s Medications</h2>
-          <div className="ps-checklist">
-            {meds.map((med, i) => (
-              <button
-                key={i}
-                className={`ps-check-item ${med.done ? 'done' : ''}`}
-                onClick={() => toggleMed(i)}
-              >
-                <div className={`ps-checkbox ${med.done ? 'checked' : ''}`}>
-                  {med.done && (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </div>
-                <div className="ps-check-info">
-                  <span className="ps-check-name">{med.name}</span>
-                  <span className="ps-check-time">{med.time}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+            <div className="ps-section">
+              <h2 className="ps-section-title">💊 Today&apos;s Medications</h2>
+              <div className="ps-checklist">
+                {meds.map((med, i) => (
+                  <button
+                    key={i}
+                    className={`ps-check-item ${med.done ? 'done' : ''}`}
+                    onClick={() => toggleMed(i)}
+                  >
+                    <div className={`ps-checkbox ${med.done ? 'checked' : ''}`}>
+                      {med.done && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="ps-check-info">
+                      <span className="ps-check-name">{med.name}</span>
+                      <span className="ps-check-time">{med.time}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Action Plan */}
-        <div className="ps-section">
-          <h2 className="ps-section-title">📋 Today&apos;s Action Plan</h2>
-          <div className="ps-checklist">
-            {taskList.map((task, i) => (
+            {/* Action Plan */}
+            <div className="ps-section">
+              <h2 className="ps-section-title">📋 Today&apos;s Action Plan</h2>
+              <div className="ps-checklist">
+                {taskList.map((task, i) => (
+                  <button
+                    key={i}
+                    className={`ps-check-item ${task.done ? 'done' : ''}`}
+                    onClick={() => toggleTask(i)}
+                  >
+                    <div className={`ps-checkbox ${task.done ? 'checked' : ''}`}>
+                      {task.done && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="ps-check-info">
+                      <span className="ps-check-name">{task.text}</span>
+                      {task.type === 'input' && !task.done && (
+                        <span className="ps-check-action">Tap to log →</span>
+                      )}
+                      {task.done && task.type === 'input' && (
+                        <span className="ps-check-action ps-logged">Logged ✓</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Submit Progress Button */}
+            <div style={{ marginTop: 'var(--space-xl)' }}>
               <button
-                key={i}
-                className={`ps-check-item ${task.done ? 'done' : ''}`}
-                onClick={() => toggleTask(i)}
+                className="btn btn-primary btn-lg"
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => alert('Your daily check-in has been securely submitted to your care team!')}
               >
-                <div className={`ps-checkbox ${task.done ? 'checked' : ''}`}>
-                  {task.done && (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </div>
-                <div className="ps-check-info">
-                  <span className="ps-check-name">{task.text}</span>
-                  {task.type === 'input' && !task.done && (
-                    <span className="ps-check-action">Tap to log →</span>
-                  )}
-                  {task.done && task.type === 'input' && (
-                    <span className="ps-check-action ps-logged">Logged ✓</span>
-                  )}
-                </div>
+                Submit Check-in
               </button>
-            ))}
-          </div>
-        </div>
+            </div>
 
           </div>
 
@@ -164,7 +175,7 @@ export default function PatientStatus() {
               <div className="ps-notes-card">
                 <div className="ps-notes-badge">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
                   </svg>
                   Written in simple language by AI
                 </div>
