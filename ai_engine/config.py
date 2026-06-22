@@ -33,7 +33,7 @@ class Settings:
 
     # --- Model Names ---
     LLM_MODEL: str = "gemini-2.5-flash-lite"             # Speed and context width
-    EMBEDDING_MODEL: str = "models/text-embedding-004"  # 768-dim embeddings
+    EMBEDDING_MODEL: str = "models/gemini-embedding-2"       # 768-dim embeddings
 
     # --- MongoDB Collection Names ---
     DB_NAME: str = "careconnect"

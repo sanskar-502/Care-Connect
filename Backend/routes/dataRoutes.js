@@ -28,4 +28,18 @@ router.get('/vitals/:patientId', getVitalsHistory);
 // GET    /api/data/notes/:patientId  → Fetch clinical notes for a patient
 router.get('/notes/:patientId', getClinicalNotes);
 
+// GET    /api/data/documents/:patientId → Fetch medical documents for a patient
+const { getMedicalDocuments } = require('../controllers/dataController');
+router.get('/documents/:patientId', getMedicalDocuments);
+
+// --- File Upload Setup ---
+const multer = require('multer');
+// We use memory storage to buffer the file and send to Python as Base64
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+// POST   /api/data/upload            → Upload Medical Document
+const { uploadMedicalDocument } = require('../controllers/dataController');
+router.post('/upload', upload.single('document'), uploadMedicalDocument);
+
 module.exports = router;

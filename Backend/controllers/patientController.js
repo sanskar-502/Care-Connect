@@ -4,6 +4,7 @@
 // ============================================================
 
 const Patient = require('../models/Patient');
+const aiEngineBridge = require('../services/aiEngineBridge');
 
 // ---------- GET /api/patients ----------
 // Fetch all patients, sorted by highest risk first
@@ -36,16 +37,82 @@ const getPatientById = async (req, res) => {
 // Create a new patient (Admission)
 const createPatient = async (req, res) => {
   try {
-    const { name, age, phone, baselineRiskScore, currentMedications } = req.body;
+    const { 
+      name, age, phone, notes, 
+      systolicBP, diastolicBP, bloodSugar, pulseRate, spo2, temperature 
+    } = req.body;
 
+    // Default values if not provided from frontend modal
+    const patientAge = age || 50;
+    const patientPhone = phone || '+15550000000';
+    let currentMedications = [];
+    let riskScore = 40;
+
+    // 1. Create the patient first so we have a valid ID for ChromaDB
     const patient = await Patient.create({
       name,
-      age,
-      phone,
-      baselineRiskScore: baselineRiskScore || 0,
-      currentRiskScore: baselineRiskScore || 0, // starts at baseline
-      currentMedications: currentMedications || [],
+      age: patientAge,
+      phone: patientPhone,
+      baselineRiskScore: riskScore,
+      currentRiskScore: riskScore,
+      currentMedications: currentMedications,
     });
+
+    // 2. Save the admission vitals so they appear on the graph immediately
+    const VitalsLog = require('../models/VitalsLog');
+    const sysBP = Number(systolicBP) || 120;
+    const diaBP = Number(diastolicBP) || 80;
+    const sugar = Number(bloodSugar) || 100;
+    
+    await VitalsLog.create({
+      patientId: patient._id,
+      systolicBP: sysBP,
+      diastolicBP: diaBP,
+      bloodSugar: sugar,
+      hr: Number(pulseRate) || 80,
+      spo2: Number(spo2) || 98,
+      temperature: Number(temperature) || 98.6,
+      medicationsTaken: true, // assume true on admit
+    });
+
+    // 3. If we received raw notes, use the AI Engine to extract structured intent
+    if (notes) {
+      console.log(`🧠 AI Engine extracting data for ${name}...`);
+      const extracted = await aiEngineBridge.extractClinicalIntent(patient._id.toString(), notes);
+
+      currentMedications = extracted.medicationChanges || extracted.medications || [];
+
+      // Generate a risk score using the ML model based on the extracted data and real vitals
+      const patientFeatures = {
+        age: patientAge,
+        systolicBP: sysBP,
+        diastolicBP: diaBP,
+        bloodSugar: sugar,
+        medicationsTaken: true,
+        baselineRiskScore: 30
+      };
+
+      const riskData = await aiEngineBridge.recalculateRisk(patientFeatures);
+      riskScore = riskData.riskScore || 40;
+
+      // Update the patient with the newly extracted data
+      patient.currentMedications = currentMedications;
+      patient.baselineRiskScore = riskScore;
+      patient.currentRiskScore = riskScore;
+      await patient.save();
+      
+      // Save the admission note so it shows in the UI
+      const ClinicalNote = require('../models/ClinicalNote');
+      await ClinicalNote.create({
+        patientId: patient._id,
+        rawText: `[ADMISSION NOTE] ${notes}`,
+        extractedIntent: extracted,
+      });
+    }
+
+    // 4. Trigger AI Insights generation for the new patient in the background
+    const dataController = require('./dataController');
+    dataController.refreshPatientInsights(patient._id);
 
     console.log(`✅ New patient admitted: ${patient.name} (ID: ${patient._id})`);
     res.status(201).json({ success: true, data: patient });

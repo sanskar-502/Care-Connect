@@ -33,6 +33,10 @@ class ExtractionSchema(BaseModel):
         default_factory=list,
         description="List of clinical actions ordered: follow-ups, tests, referrals, procedures."
     )
+    riskSignal: str = Field(
+        default="neutral",
+        description="Must be 'positive' (improving condition/relieved pain), 'negative' (worsening condition/severe pain), or 'neutral'."
+    )
 
 
 # ============================================================
@@ -65,7 +69,7 @@ def extract_clinical_intent(raw_text: str) -> Dict:
 
         # --- Build the prompt ---
         prompt = ChatPromptTemplate.from_messages([
-            ("system", EXTRACTION_PROMPT),
+            ("user", EXTRACTION_PROMPT),
         ])
 
         # --- Run the chain ---
@@ -151,8 +155,19 @@ def _mock_extraction(raw_text: str) -> Dict:
     medications = [kw for kw in med_keywords if kw in text_lower]
     actions = [kw for kw in action_keywords if kw in text_lower]
 
+    is_improving = any(kw in text_lower for kw in ["improving", "better", "reduces", "gone", "no pain", "resolved", "clear", "relive", "relieved"])
+    is_worsening = any(kw in text_lower for kw in ["worsening", "severe", "increased", "worse", "critical"])
+    has_pain = "pain" in text_lower
+
+    risk_signal = "neutral"
+    if is_improving:
+        risk_signal = "positive"
+    elif is_worsening or (has_pain and not is_improving):
+        risk_signal = "negative"
+
     return {
         "symptoms": symptoms or ["Unable to extract — AI Engine offline"],
         "medicationChanges": medications,
         "actions": actions or ["Review note manually"],
+        "riskSignal": risk_signal,
     }

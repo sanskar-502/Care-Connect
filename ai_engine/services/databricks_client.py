@@ -81,14 +81,20 @@ def _calculate_mock_risk(features: Dict) -> float:
     score = 30.0  # Baseline
 
     # Age factor
-    age = features.get("age", 50)
+    try:
+        age = float(features.get("age", 50))
+    except (ValueError, TypeError):
+        age = 50
     if age > 70:
         score += 15
     elif age > 60:
         score += 8
 
     # Blood pressure factor
-    systolic = features.get("systolicBP", 120)
+    try:
+        systolic = float(features.get("systolicBP", 120))
+    except (ValueError, TypeError):
+        systolic = 120
     if systolic > 160:
         score += 20
     elif systolic > 140:
@@ -97,19 +103,28 @@ def _calculate_mock_risk(features: Dict) -> float:
         score += 10
 
     # Blood sugar factor
-    sugar = features.get("bloodSugar", 100)
+    try:
+        sugar = float(features.get("bloodSugar", 100))
+    except (ValueError, TypeError):
+        sugar = 100
     if sugar > 250:
         score += 15
     elif sugar > 180:
         score += 8
 
     # Medication adherence
-    meds_taken = features.get("medicationsTaken", True)
+    # Ensure meds_taken is evaluated as boolean
+    meds_taken_raw = features.get("medicationsTaken", True)
+    meds_taken = str(meds_taken_raw).lower() == 'true' if isinstance(meds_taken_raw, str) else bool(meds_taken_raw)
+    
     if not meds_taken:
         score += 12
 
     # Baseline risk factor
-    baseline = features.get("baselineRiskScore", 0)
+    try:
+        baseline = float(features.get("baselineRiskScore", 0))
+    except (ValueError, TypeError):
+        baseline = 0
     if baseline > 60:
         score += 10
 

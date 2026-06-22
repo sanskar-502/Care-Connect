@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { getPatients } from '../services/api';
+import { getPatients, admitPatient } from '../services/api';
 import { io } from 'socket.io-client';
 import './Dashboard.css';
 
@@ -193,68 +193,111 @@ export default function Dashboard() {
       </main>
 
       {/* Admit Patient Modal */}
-      {showAdmit && <AdmitModal onClose={() => setShowAdmit(false)} />}
+      {showAdmit && <AdmitModal onClose={() => setShowAdmit(false)} onSuccess={() => {
+        getPatients().then(data => {
+          setPatients(data.sort((a, b) => b.currentRiskScore - a.currentRiskScore));
+        });
+      }} />}
     </div>
   );
 }
 
 /* ---- Admit Patient Modal ---- */
-function AdmitModal({ onClose }) {
+function AdmitModal({ onClose, onSuccess }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: 'John Doe', age: 50, gender: 'Male', phone: '+15550000000',
+    address: '123 Health St', bloodGroup: 'O+', emergencyContact: 'Jane Doe',
+    systolicBP: 120, diastolicBP: 80, bloodSugar: 100,
+    pulseRate: 80, spo2: 98, temperature: 98.6, weight: 70, height: 170,
+    notes: 'Patient presents with worsening dyspnea.'
+  });
+  const [file, setFile] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) setFile(e.target.files[0]);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const newPatient = await admitPatient(formData);
+      
+      if (file && newPatient && newPatient._id) {
+        const fileData = new FormData();
+        fileData.append('patientId', newPatient._id);
+        fileData.append('document', file);
+        await fetch('http://localhost:5000/api/data/upload', {
+          method: 'POST',
+          body: fileData
+        });
+      }
+
+      if (onSuccess) onSuccess();
       onClose();
-    }, 2000);
+      if (newPatient && newPatient._id) {
+        navigate(`/patient/${newPatient._id}`);
+      }
+    } catch (error) {
+      console.error("Admission failed:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content admit-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="admit-header">
-          <h2>➕ New Patient Admission</h2>
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1000, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', overflowY: 'auto' }}>
+      <div className="modal-content admit-modal" onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-surface)', padding: '2rem', borderRadius: '12px', maxWidth: '800px', margin: '40px auto', position: 'relative' }}>
+        <div className="admit-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ margin: 0, color: 'white' }}>➕ New Patient Admission</h2>
           <button className="btn btn-icon btn-ghost" onClick={onClose}>✕</button>
         </div>
 
-        <form className="admit-form" onSubmit={handleSubmit}>
-          <div className="admit-split">
-            {/* Left: Structured Data */}
-            <div className="admit-left">
-               <p style={{color: 'white', marginBottom: '1rem'}}>
-                 Admitting new patients via UI takes data and sends it to `POST /api/patients`. 
-                 (Wired in future sprints, currently using seed data).
-               </p>
-               <div className="form-group">
-                 <label>Patient Name</label>
-                 <input className="input" placeholder="Full name" defaultValue="John Doe" />
-               </div>
-            </div>
-
-            {/* Right: Unstructured Data */}
-            <div className="admit-right">
-              <h3 className="admit-section-title">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                Unstructured Data
-              </h3>
-              <div className="form-group">
-                <label>Admitting Physician&apos;s Notes</label>
-                <textarea
-                  className="textarea"
-                  rows="8"
-                  placeholder="Paste clinical notes here..."
-                  defaultValue="Patient presents with worsening dyspnea."
-                />
-              </div>
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
+          <div>
+            <h3 style={{ color: 'var(--accent-primary)', marginBottom: '10px' }}>Basic Details</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <input name="name" className="input" placeholder="Patient Name" value={formData.name} onChange={handleChange} required />
+              <input name="age" className="input" type="number" placeholder="Age" value={formData.age} onChange={handleChange} required />
+              <input name="gender" className="input" placeholder="Gender" value={formData.gender} onChange={handleChange} />
+              <input name="phone" className="input" placeholder="Contact Number" value={formData.phone} onChange={handleChange} required />
+              <input name="address" className="input" placeholder="Address" value={formData.address} onChange={handleChange} />
+              <input name="bloodGroup" className="input" placeholder="Blood Group" value={formData.bloodGroup} onChange={handleChange} />
+              <input name="emergencyContact" className="input" placeholder="Emergency Contact" value={formData.emergencyContact} onChange={handleChange} />
             </div>
           </div>
 
-          <div className="admit-footer">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary btn-lg" disabled={loading} id="run-assessment-btn">
-              {loading ? <span className="spinner" /> : "Run Initial Assessment"}
+          <div>
+            <h3 style={{ color: 'var(--accent-primary)', marginBottom: '10px' }}>Initial Health Details</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+              <input name="systolicBP" className="input" type="number" placeholder="Systolic BP" value={formData.systolicBP} onChange={handleChange} />
+              <input name="diastolicBP" className="input" type="number" placeholder="Diastolic BP" value={formData.diastolicBP} onChange={handleChange} />
+              <input name="bloodSugar" className="input" type="number" placeholder="Blood Sugar" value={formData.bloodSugar} onChange={handleChange} />
+              <input name="pulseRate" className="input" type="number" placeholder="Pulse Rate" value={formData.pulseRate} onChange={handleChange} />
+              <input name="spo2" className="input" type="number" placeholder="SpO2 (%)" value={formData.spo2} onChange={handleChange} />
+              <input name="temperature" className="input" type="number" placeholder="Temperature (°F)" value={formData.temperature} onChange={handleChange} />
+              <input name="weight" className="input" type="number" placeholder="Weight (kg)" value={formData.weight} onChange={handleChange} />
+              <input name="height" className="input" type="number" placeholder="Height (cm)" value={formData.height} onChange={handleChange} />
+            </div>
+          </div>
+
+          <div>
+            <h3 style={{ color: 'var(--accent-primary)', marginBottom: '10px' }}>Clinical Notes (for AI Extraction)</h3>
+            <textarea name="notes" className="input" placeholder="Enter clinical dictation..." value={formData.notes} onChange={handleChange} rows="3" style={{ width: '100%' }}></textarea>
+          </div>
+
+          <div>
+            <h3 style={{ color: 'var(--accent-primary)', marginBottom: '10px' }}>Document Upload (Optional)</h3>
+            <input type="file" onChange={handleFileChange} accept=".pdf,.png,.jpg,.jpeg,.webp" className="input" style={{ width: '100%', padding: '6px' }} />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? 'Admitting...' : 'Admit Patient'}
             </button>
           </div>
         </form>

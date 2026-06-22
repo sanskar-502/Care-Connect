@@ -1,15 +1,78 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { patients, chatSuggestions, sampleChatResponses } from '../data/mockData';
+import { getPatientById, uploadMedicalDocument, ingestVitals, getMedicalDocuments, getVitalsHistory } from '../services/api';
+import { chatSuggestions, sampleChatResponses } from '../data/mockData';
 import './PatientDetail.css';
 
 export default function PatientDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const patient = patients.find((p) => p.id === id);
-  const [interventions, setInterventions] = useState(patient?.interventions || {});
+  const [patient, setPatient] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [interventions, setInterventions] = useState({});
   const [showDischarge, setShowDischarge] = useState(false);
+
+  const fetchPatient = async () => {
+    try {
+      const data = await getPatientById(id);
+      const docsData = await getMedicalDocuments(id).catch(() => []);
+      const vitalsRaw = await getVitalsHistory(id).catch(() => []);
+      
+      const formattedVitals = vitalsRaw.map(v => ({
+        day: new Date(v.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        sugar: v.bloodSugar,
+        bpSys: v.systolicBP,
+        hr: v.pulseRate,
+        spo2: v.spo2
+      })).reverse();
+      
+      // Add fallbacks for UI elements not yet in DB
+      const enrichedData = {
+        ...data,
+        gender: data.gender || 'Unknown',
+        room: data.room || 'TBD',
+        bloodType: data.bloodType || 'Unknown',
+        allergies: data.allergies || [],
+        vitals: data.vitals || { pulseRate: 80, systolicBP: 120, diastolicBP: 80, temperature: 98.6, spo2: 98 },
+        clinicalHistory: data.clinicalHistory || [],
+        documents: docsData || [],
+        shapFactors: data.shapFactors || [
+          { feature: 'Recent Admission', impact: 14, direction: 'up' },
+          { feature: 'Medication Non-adherence', impact: 8, direction: 'up' },
+          { feature: 'Age > 65', impact: 5, direction: 'up' }
+        ],
+        interventionEffects: data.interventionEffects || {
+          homeNurse: -12,
+          telehealth: -5,
+          medicationReminder: -8,
+          dietPlan: -3,
+        },
+        primaryDiagnosis: data.primaryDiagnosis || 'Newly Admitted',
+        vitalHistory: formattedVitals.length > 0 ? formattedVitals : data.vitalHistory || []
+      };
+      setPatient(enrichedData);
+    } catch (err) {
+      console.error("Failed to fetch patient", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatient();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="page-wrapper">
+        <Navbar />
+        <div style={{ padding: '120px 40px', textAlign: 'center', color: 'white' }}>
+          <h2>Loading Patient Data...</h2>
+        </div>
+      </div>
+    );
+  }
 
   if (!patient) {
     return (
@@ -23,9 +86,11 @@ export default function PatientDetail() {
     );
   }
 
+  const riskScore = patient.currentRiskScore || patient.riskScore || 50;
+
   const currentRisk = Object.entries(interventions).reduce((risk, [key, active]) => {
     return active ? risk + (patient.interventionEffects[key] || 0) : risk;
-  }, patient.riskScore);
+  }, riskScore);
 
   const clampedRisk = Math.max(0, Math.min(100, currentRisk));
 
@@ -41,8 +106,8 @@ export default function PatientDetail() {
         <div className="patient-header card animate-fade-in-up">
           <div className="ph-left">
             <div className="ph-avatar" style={{
-              background: patient.riskScore >= 70 ? 'var(--color-danger-soft)' : 'var(--accent-primary-glow)',
-              color: patient.riskScore >= 70 ? 'var(--color-danger)' : 'var(--accent-primary)',
+              background: riskScore >= 70 ? 'var(--color-danger-soft)' : 'var(--accent-primary-glow)',
+              color: riskScore >= 70 ? 'var(--color-danger)' : 'var(--accent-primary)',
             }}>
               {patient.name.split(' ').map((n) => n[0]).join('')}
             </div>
@@ -66,10 +131,10 @@ export default function PatientDetail() {
               }
             </div>
             <div className="ph-vitals">
-              <span>♥ {patient.vitals.hr} bpm</span>
-              <span>BP {patient.vitals.bp}</span>
-              <span>🌡 {patient.vitals.temp}</span>
-              <span>SpO₂ {patient.vitals.spo2}</span>
+              <span>♥ {patient.vitals?.pulseRate || '--'} bpm</span>
+              <span>BP {patient.vitals?.systolicBP || '--'}/{patient.vitals?.diastolicBP || '--'}</span>
+              <span>🌡 {patient.vitals?.temperature || '--'}</span>
+              <span>SpO₂ {patient.vitals?.spo2 || '--'}</span>
             </div>
           </div>
         </div>
@@ -79,12 +144,14 @@ export default function PatientDetail() {
           {/* LEFT COLUMN: Clinical History + Dictation */}
           <div className="pg-left animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
             <ClinicalHistory notes={patient.clinicalHistory} />
-            <DictationHub />
+            <DictationHub patient={patient} onNoteSaved={fetchPatient} />
+            <RecordVitalsCard patient={patient} onVitalsRecorded={fetchPatient} />
+            <DocumentUploader patient={patient} onUploadSuccess={fetchPatient} />
           </div>
 
           {/* CENTER COLUMN: Risk Dial + SHAP + What-If */}
           <div className="pg-center animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            <RiskDial risk={clampedRisk} originalRisk={patient.riskScore} />
+            <RiskDial risk={clampedRisk} originalRisk={riskScore} />
             <SHAPChart
               factors={patient.shapFactors}
               interventions={interventions}
@@ -100,7 +167,7 @@ export default function PatientDetail() {
 
           {/* RIGHT COLUMN: RAG Copilot */}
           <div className="pg-right animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-            <RAGCopilot patientName={patient.name} />
+            <RAGCopilot patientName={patient.name} patientId={patient._id || patient.id} />
           </div>
         </div>
 
@@ -108,6 +175,13 @@ export default function PatientDetail() {
         <div className="animate-fade-in-up" style={{ animationDelay: '0.4s', marginTop: 'var(--space-lg)' }}>
           <VitalsTrendChart history={patient.vitalHistory} diagnosis={patient.primaryDiagnosis} />
         </div>
+
+        {/* AI Insights Section */}
+        {patient.aiInsights && patient.aiInsights.currentCondition && (
+          <div className="animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
+            <AIInsightsSection insights={patient.aiInsights} />
+          </div>
+        )}
       </main>
 
       {showDischarge && (
@@ -171,27 +245,32 @@ function VitalsTrendChart({ history = [], diagnosis }) {
   }, [activeMetric]);
 
   const metric = METRICS[activeMetric];
-  const values = history.map((d) => d[metric.key]);
-  const days   = history.map((d) => d.day);
+  const validHistory = history.filter(d => typeof d[metric.key] === 'number' && !isNaN(d[metric.key]));
+  
+  const values = validHistory.map((d) => d[metric.key]);
+  const days   = validHistory.map((d) => d.day);
 
   // Chart dimensions
   const W = 900, H = 200, PAD_L = 52, PAD_R = 20, PAD_T = 20, PAD_B = 40;
   const chartW = W - PAD_L - PAD_R;
   const chartH = H - PAD_T - PAD_B;
 
-  const minVal = Math.min(...values, metric.refLow) - 5;
-  const maxVal = Math.max(...values, metric.refHigh) + 5;
+  const minVal = values.length > 0 ? Math.min(...values, metric.refLow) - 5 : metric.refLow - 5;
+  const maxVal = values.length > 0 ? Math.max(...values, metric.refHigh) + 5 : metric.refHigh + 5;
   const range  = maxVal - minVal || 1;
 
-  const toX = (i) => PAD_L + (i / (values.length - 1)) * chartW;
+  const toX = (i) => {
+    if (values.length <= 1) return PAD_L + chartW / 2;
+    return PAD_L + (i / (values.length - 1)) * chartW;
+  };
   const toY = (v) => PAD_T + chartH - ((v - minVal) / range) * chartH;
 
-  const polyPoints = values.map((v, i) => `${toX(i)},${toY(v)}`).join(' ');
-  const fillPoints = [
+  const polyPoints = values.length > 0 ? values.map((v, i) => `${toX(i)},${toY(v)}`).join(' ') : '';
+  const fillPoints = values.length > 0 ? [
     `${toX(0)},${H - PAD_B}`,
     ...values.map((v, i) => `${toX(i)},${toY(v)}`),
     `${toX(values.length - 1)},${H - PAD_B}`,
-  ].join(' ');
+  ].join(' ') : '';
 
   // Y-axis ticks
   const tickCount = 5;
@@ -201,10 +280,10 @@ function VitalsTrendChart({ history = [], diagnosis }) {
   });
 
   // Latest value stats
-  const latest   = values[values.length - 1];
-  const previous = values[values.length - 2];
-  const delta    = latest - previous;
-  const inRange  = latest >= metric.refLow && latest <= metric.refHigh;
+  const latest   = values.length > 0 ? values[values.length - 1] : '--';
+  const previous = values.length > 1 ? values[values.length - 2] : latest;
+  const delta    = latest !== '--' && previous !== '--' ? latest - previous : 0;
+  const inRange  = latest !== '--' ? latest >= metric.refLow && latest <= metric.refHigh : true;
 
   return (
     <div className="card vitals-chart-card">
@@ -384,7 +463,7 @@ function ClinicalHistory({ notes }) {
   );
 }
 
-function DictationHub() {
+function DictationHub({ patient, onNoteSaved }) {
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
@@ -431,12 +510,17 @@ function DictationHub() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patientId: "69d8e00c1228569c07a2c636", // Fallback seeded ID for demo
+          patientId: patient._id || patient.id, // Use actual patient ID
           rawText: transcript
         })
       });
       const data = await res.json();
       console.log('AI Extraction Success:', data);
+      
+      // Update patient state to reflect any new risk scores or data
+      if (onNoteSaved) {
+        await onNoteSaved();
+      }
     } catch (err) {
       console.error('AI Extraction Failed:', err);
     } finally {
@@ -637,9 +721,9 @@ function SHAPChart({ factors, interventions, interventionEffects, onToggle }) {
   );
 }
 
-function RAGCopilot({ patientName }) {
+function RAGCopilot({ patientName, patientId }) {
   const [messages, setMessages] = useState([
-    { role: 'ai', text: `Hello! I'm your AI copilot for **${patientName}**. Ask me anything about this patient's history, medications, or care plan.` },
+    { role: 'ai', text: `Hello! I'm your AI copilot for **${patientName}**. Ask me anything about this patient's history, medications, or care plan.` }
   ]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
@@ -649,19 +733,28 @@ function RAGCopilot({ patientName }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typing]);
 
-  const sendMessage = (text) => {
+  const sendMessage = async (text) => {
     const query = text || input;
     if (!query.trim()) return;
     setMessages((prev) => [...prev, { role: 'user', text: query }]);
     setInput('');
     setTyping(true);
 
-    setTimeout(() => {
-      const response = sampleChatResponses[query] ||
-        `Based on the clinical records for ${patientName}, I've analyzed the relevant data. This is a simulated response — in production, this would query the RAG pipeline with the patient's full history from MongoDB and return contextualized medical insights.`;
-      setMessages((prev) => [...prev, { role: 'ai', text: response }]);
+    try {
+      const res = await fetch('http://localhost:5000/api/data/copilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId, query })
+      });
+      const data = await res.json();
+      const responseText = data.success ? data.data.answer : 'Error: Failed to fetch from RAG Copilot.';
+      setMessages((prev) => [...prev, { role: 'ai', text: responseText }]);
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [...prev, { role: 'ai', text: 'Error connecting to AI Copilot.' }]);
+    } finally {
       setTyping(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -669,11 +762,13 @@ function RAGCopilot({ patientName }) {
       <h3 className="section-label">🤖 RAG Medical Copilot</h3>
 
       {/* Suggested prompts */}
-      <div className="rag-suggestions">
-        {chatSuggestions.map((s) => (
-          <button key={s} className="rag-pill" onClick={() => sendMessage(s)}>{s}</button>
-        ))}
-      </div>
+      {messages.length === 1 && (
+        <div className="rag-suggestions">
+          {chatSuggestions.map((s) => (
+            <button key={s} className="rag-pill" onClick={() => sendMessage(s)}>{s}</button>
+          ))}
+        </div>
+      )}
 
       {/* Chat messages */}
       <div className="rag-messages">
@@ -809,6 +904,132 @@ Take your medications as prescribed. If you feel unwell, reply HELP anytime. �
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DocumentUploader({ patient, onUploadSuccess }) {
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      await uploadMedicalDocument(patient._id || patient.id, file);
+      setFile(null);
+      if (onUploadSuccess) await onUploadSuccess();
+    } catch (err) {
+      console.error('Failed to upload document', err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 'var(--space-md)' }}>
+      <h3 className="section-label">📄 Medical Documents</h3>
+      
+      {patient.documents && patient.documents.length > 0 && (
+        <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 12px 0', fontSize: '13px' }}>
+          {patient.documents.map(doc => (
+            <li key={doc._id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', marginBottom: '6px' }}>
+              <span style={{ fontSize: '16px' }}>{doc.mimeType?.includes('pdf') ? '📕' : '🖼️'}</span>
+              <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ color: 'white' }}>{doc.fileName}</div>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>{new Date(doc.uploadDate).toLocaleDateString()}</div>
+              </div>
+              <span className="pill pill-success" style={{ fontSize: '10px' }}>AI Extracted</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <input type="file" onChange={handleFileChange} accept=".pdf,.png,.jpg,.jpeg,.webp" className="input" style={{ marginBottom: '8px', padding: '6px', fontSize: '12px' }} />
+      <button className="btn btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: '100%' }}>
+        {uploading ? 'Processing AI Extraction...' : 'Upload & Extract'}
+      </button>
+    </div>
+  );
+}
+
+function RecordVitalsCard({ patient, onVitalsRecorded }) {
+  const [vitals, setVitals] = useState({
+    systolicBP: '', diastolicBP: '', bloodSugar: '', medicationsTaken: false
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!vitals.systolicBP || !vitals.diastolicBP || !vitals.bloodSugar) return;
+    setSaving(true);
+    try {
+      await ingestVitals({
+        patientId: patient._id || patient.id,
+        systolicBP: parseInt(vitals.systolicBP),
+        diastolicBP: parseInt(vitals.diastolicBP),
+        bloodSugar: parseInt(vitals.bloodSugar),
+        medicationsTaken: vitals.medicationsTaken
+      });
+      setVitals({ systolicBP: '', diastolicBP: '', bloodSugar: '', medicationsTaken: false });
+      if (onVitalsRecorded) await onVitalsRecorded();
+    } catch (err) {
+      console.error('Failed to record vitals', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 'var(--space-md)' }}>
+      <h3 className="section-label">🩺 Record Vitals</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+        <input type="number" placeholder="Systolic BP" className="input" value={vitals.systolicBP} onChange={e => setVitals({...vitals, systolicBP: e.target.value})} />
+        <input type="number" placeholder="Diastolic BP" className="input" value={vitals.diastolicBP} onChange={e => setVitals({...vitals, diastolicBP: e.target.value})} />
+        <input type="number" placeholder="Blood Sugar" className="input" value={vitals.bloodSugar} onChange={e => setVitals({...vitals, bloodSugar: e.target.value})} />
+        <label style={{ display: 'flex', alignItems: 'center', fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
+          <input type="checkbox" checked={vitals.medicationsTaken} onChange={e => setVitals({...vitals, medicationsTaken: e.target.checked})} style={{ marginRight: '6px' }} />
+          Meds Taken
+        </label>
+      </div>
+      <button className="btn btn-primary" onClick={handleSave} disabled={saving || !vitals.systolicBP || !vitals.diastolicBP || !vitals.bloodSugar} style={{ width: '100%' }}>
+        {saving ? 'Saving...' : 'Record Vitals'}
+      </button>
+    </div>
+  );
+}
+
+function AIInsightsSection({ insights }) {
+  if (!insights) return null;
+  return (
+    <div className="card" style={{ marginTop: 'var(--space-lg)', borderLeft: '4px solid var(--accent-primary)' }}>
+      <h3 className="section-label">🧠 Patient Health Summary (AI Generated)</h3>
+      <p style={{ color: 'rgba(255,255,255,0.9)', marginBottom: '12px', lineHeight: '1.5' }}>{insights.currentCondition}</p>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div>
+          <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>Identified Risks</h4>
+          <ul style={{ paddingLeft: '20px', margin: 0, color: 'var(--color-danger)' }}>
+            {insights.risks?.map((r, i) => <li key={i}>{r}</li>)}
+            {(!insights.risks || insights.risks.length === 0) && <li style={{color: 'rgba(255,255,255,0.5)'}}>None identified</li>}
+          </ul>
+        </div>
+        <div>
+          <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>Recommendations</h4>
+          <ul style={{ paddingLeft: '20px', margin: 0, color: 'var(--color-success)' }}>
+            {insights.recommendations?.map((r, i) => <li key={i}>{r}</li>)}
+            {(!insights.recommendations || insights.recommendations.length === 0) && <li style={{color: 'rgba(255,255,255,0.5)'}}>None at this time</li>}
+          </ul>
+        </div>
+      </div>
+      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '12px', textAlign: 'right' }}>
+        Last updated: {new Date(insights.lastUpdated).toLocaleString()}
       </div>
     </div>
   );

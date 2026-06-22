@@ -9,6 +9,7 @@ Handles:
 
 from typing import Optional
 from pymongo import MongoClient
+from bson.objectid import ObjectId
 
 from config import settings
 from prompts import SUMMARY_PROMPT, RAG_PROMPT
@@ -68,7 +69,7 @@ def generate_patient_summary(vitals_data: dict) -> str:
 
         # --- Build and run the chain ---
         prompt = ChatPromptTemplate.from_messages([
-            ("system", SUMMARY_PROMPT),
+            ("user", SUMMARY_PROMPT),
         ])
 
         chain = prompt | llm
@@ -111,12 +112,9 @@ def query_copilot(patient_id: str, question: str) -> str:
         # --- Step 1: Generate question embedding ---
         question_embedding = generate_embedding(question)
 
-        # --- Step 2: Retrieve context via Vector Search ---
-        context_chunks = _vector_search(patient_id, question_embedding)
-
-        if not context_chunks:
-            # If no chunks found, try a text-based fallback search
-            context_chunks = _text_fallback_search(patient_id)
+        # --- Step 2: Retrieve context via ChromaDB ---
+        from services.chroma_service import query_records
+        context_chunks = query_records(patient_id, question_embedding, top_k=5)
 
         if not context_chunks:
             return (
@@ -141,7 +139,7 @@ def query_copilot(patient_id: str, question: str) -> str:
         )
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", RAG_PROMPT),
+            ("user", RAG_PROMPT),
         ])
 
         chain = prompt | llm
@@ -160,114 +158,7 @@ def query_copilot(patient_id: str, question: str) -> str:
         return (
             f"[Mock Response] The AI Engine encountered an error processing your query. "
             f"Your question \"{question}\" for patient {patient_id} has been logged. "
-            f"In production, this would search the patient's full clinical history "
-            f"via MongoDB Atlas Vector Search and generate a grounded response."
         )
-
-
-# ============================================================
-# Vector Search — MongoDB Atlas
-# ============================================================
-def _vector_search(patient_id: str, query_embedding: list, top_k: int = 5) -> list:
-    """
-    Perform MongoDB Atlas Vector Search on ClinicalNotes.
-
-    CRITICAL: Pre-filters by patientId to prevent cross-patient data leakage.
-    """
-    try:
-        db = _get_mongo_db()
-        if db is None:
-            return []
-
-        collection = db[settings.COLLECTION_CLINICAL_NOTES]
-
-        # --- Atlas Vector Search aggregation pipeline ---
-        # Uses the $vectorSearch stage (Atlas-specific)
-        pipeline = [
-            {
-                "$vectorSearch": {
-                    "index": settings.VECTOR_INDEX_NAME,
-                    "path": "embedding",
-                    "queryVector": query_embedding,
-                    "numCandidates": 50,
-                    "limit": top_k,
-                    # CRITICAL: Pre-filter to prevent data leakage
-                    "filter": {
-                        "patientId": patient_id
-                    }
-                }
-            },
-            {
-                "$project": {
-                    "text": "$rawText",
-                    "type": "clinical_note",
-                    "date": "$timestamp",
-                    "score": {"$meta": "vectorSearchScore"},
-                    "_id": 0,
-                }
-            }
-        ]
-
-        results = list(collection.aggregate(pipeline))
-        print(f"🔎 Vector search returned {len(results)} chunks for patient {patient_id}")
-        return results
-
-    except Exception as e:
-        print(f"⚠️  Vector search failed: {e}")
-        return []
-
-
-# ============================================================
-# Text Fallback Search — Simple MongoDB Query
-# Used when vector search is not configured or fails.
-# ============================================================
-def _text_fallback_search(patient_id: str, limit: int = 5) -> list:
-    """
-    Fallback: Regular MongoDB find() on ClinicalNotes and VitalsLogs.
-    Used during hackathon if Atlas Vector Search index isn't set up.
-    """
-    try:
-        db = _get_mongo_db()
-        if db is None:
-            return []
-
-        chunks = []
-
-        # --- Fetch recent clinical notes ---
-        notes = db[settings.COLLECTION_CLINICAL_NOTES].find(
-            {"patientId": patient_id}
-        ).sort("timestamp", -1).limit(limit)
-
-        for note in notes:
-            chunks.append({
-                "type": "clinical_note",
-                "date": str(note.get("timestamp", "")),
-                "text": note.get("rawText", ""),
-            })
-
-        # --- Fetch recent vitals ---
-        vitals = db[settings.COLLECTION_VITALS_LOGS].find(
-            {"patientId": patient_id}
-        ).sort("timestamp", -1).limit(limit)
-
-        for v in vitals:
-            chunks.append({
-                "type": "vitals_log",
-                "date": str(v.get("timestamp", "")),
-                "text": (
-                    f"BP: {v.get('systolicBP', '?')}/{v.get('diastolicBP', '?')}, "
-                    f"Sugar: {v.get('bloodSugar', '?')} mg/dL, "
-                    f"Medications taken: {'Yes' if v.get('medicationsTaken') else 'No'}"
-                ),
-            })
-
-        print(f"📄 Text fallback returned {len(chunks)} chunks for patient {patient_id}")
-        return chunks
-
-    except Exception as e:
-        print(f"⚠️  Text fallback search failed: {e}")
-        return []
-
 
 # ============================================================
 # Helpers

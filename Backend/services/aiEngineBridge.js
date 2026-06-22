@@ -9,16 +9,18 @@ const axios = require('axios');
 
 const PYTHON_URL = process.env.PYTHON_ENGINE_URL || 'http://localhost:8000';
 
-// ---------- Helper: safe POST with graceful fallback ----------
 const safePost = async (endpoint, payload, fallback) => {
   try {
     const response = await axios.post(`${PYTHON_URL}${endpoint}`, payload, {
-      timeout: 10000, // 10-second timeout
+      timeout: 30000, // 30-second timeout to allow slow Gemini LLM calls (e.g. RAG Copilot) to complete
       headers: { 'Content-Type': 'application/json' },
     });
     return response.data;
   } catch (error) {
     console.warn(`⚠️  AI Engine offline or error at ${endpoint}: ${error.message}`);
+    if (error.response && error.response.data) {
+      console.warn(`   → Details:`, JSON.stringify(error.response.data));
+    }
     console.warn(`   → Returning mock fallback data.`);
     return fallback;
   }
@@ -43,15 +45,16 @@ const generateSummary = async (vitalsData) => {
 // 2. Extract Clinical Intent from Dictation
 //    Sends raw doctor text to the NLP pipeline for structured extraction
 // ============================================================
-const extractClinicalIntent = async (rawText) => {
+const extractClinicalIntent = async (patientId, rawText) => {
   const fallback = {
     symptoms: ['Unable to extract — AI Engine offline'],
     medications: [],
     actions: ['Review note manually'],
+    riskSignal: 'neutral',
     rawText: rawText,
   };
 
-  return safePost('/api/extract-note', { rawText }, fallback);
+  return safePost('/api/extract-note', { patientId, rawText }, fallback);
 };
 
 // ============================================================
@@ -63,10 +66,9 @@ const recalculateRisk = async (patientData) => {
   const fallback = {
     riskScore: patientData.currentRiskScore || 50,
     confidence: 0.0,
-    source: 'mock_fallback',
   };
 
-  return safePost('/api/predict-risk', patientData, fallback);
+  return safePost('/api/predict-risk', { patient_features: patientData }, fallback);
 };
 
 // ============================================================
@@ -85,9 +87,37 @@ const queryRAGCopilot = async (patientId, query) => {
   return safePost('/api/rag-query', { patientId, query }, fallback);
 };
 
+// ============================================================
+// 5. Process Medical Document
+//    Sends file base64 to Gemini Vision for extraction
+// ============================================================
+const processDocument = async (patientId, mimeType, fileBase64) => {
+  const fallback = {
+    extracted: { diagnosis: 'AI Engine offline', medications: [], testResults: [], recommendations: [] },
+    rawText: 'AI Engine offline',
+    embedding: new Array(768).fill(0.0)
+  };
+  return safePost('/api/process-document', { patientId, mimeType, fileBase64 }, fallback);
+};
+
+// ============================================================
+// 6. Generate Patient Insights
+//    Sends full context to LLM to generate holistic summary
+// ============================================================
+const generatePatientInsights = async (context) => {
+  const fallback = {
+    currentCondition: 'AI Engine offline. Unable to generate insights.',
+    risks: [],
+    recommendations: []
+  };
+  return safePost('/api/generate-insights', { context }, fallback);
+};
+
 module.exports = {
   generateSummary,
   extractClinicalIntent,
   recalculateRisk,
   queryRAGCopilot,
+  processDocument,
+  generatePatientInsights,
 };

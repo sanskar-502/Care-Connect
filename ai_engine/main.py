@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from api.endpoints import router as api_router
+from api.document_endpoints import router as doc_router
 
 # ---------- Initialize FastAPI ----------
 app = FastAPI(
@@ -42,6 +43,7 @@ app.add_middleware(
 
 # ---------- Mount API Routes ----------
 app.include_router(api_router, prefix="/api")
+app.include_router(doc_router, prefix="/api")
 
 # ---------- Health Check ----------
 @app.get("/", tags=["Health"])

@@ -41,6 +41,7 @@ Focus on extracting:
 1. **symptoms**: Any symptoms, complaints, or observations about the patient's condition.
 2. **medicationChanges**: Any new medications prescribed, dosage changes, or medications stopped.
 3. **actions**: Any clinical actions ordered (e.g., "schedule follow-up", "order CT scan", "refer to cardiology").
+4. **riskSignal**: Evaluate the clinical intent of the note. Output "positive" if the patient is improving or relieved, "negative" if they are worsening or in pain, or "neutral" otherwise.
 
 Be precise. Only extract what is explicitly stated. Do not infer or hallucinate.
 
@@ -70,3 +71,41 @@ STRICT RULES:
 Doctor's Question: {question}
 
 Answer:"""
+
+
+# ============================================================
+# 4. DOCUMENT EXTRACTION PROMPT
+#    Used by: document_processor.py
+#    Purpose: OCR and semantic extraction from Medical Documents
+# ============================================================
+DOCUMENT_EXTRACTION_PROMPT = """You are an expert clinical data extractor for CareConnect Hospital.
+
+Analyze the provided medical document (which may be a lab report, prescription, doctor's note, or scan report).
+Extract the following information:
+1. **diagnosis**: The primary diagnosis or impression mentioned in the report. If none, output "No diagnosis found."
+2. **medications**: A list of any medications prescribed, adjusted, or mentioned.
+3. **testResults**: A summary of key lab or imaging results (e.g., "Blood pressure 140/90", "Normal sinus rhythm on EKG").
+4. **recommendations**: Any follow-up actions, lifestyle changes, or procedures recommended by the physician.
+
+Extract ONLY what is present in the document. Do not invent information."""
+
+
+# ============================================================
+# 5. PATIENT INSIGHTS PROMPT
+#    Used by: document_endpoints.py -> generate_insights
+#    Purpose: Create a holistic summary of the patient's condition.
+# ============================================================
+PATIENT_INSIGHTS_PROMPT = """You are the Chief Medical AI for CareConnect Hospital.
+
+Analyze the provided patient profile, recent vitals, clinical notes, and medical documents to generate a holistic health summary.
+
+--- PATIENT CONTEXT ---
+{context}
+--- END CONTEXT ---
+
+Based on the context above, provide a comprehensive analysis with the following:
+1. **currentCondition**: A 2-3 sentence summary of their current stability and trajectory (e.g., "Patient is stable but showing mildly elevated blood pressure. Sugar levels are improving.").
+2. **risks**: A list of 1-3 specific clinical risks (e.g., "Hypertension Risk", "Infection Risk").
+3. **recommendations**: A list of 1-3 actionable recommendations for the care team (e.g., "Monitor BP twice daily", "Schedule cardiology follow-up").
+
+Be objective, clinical, and concise."""

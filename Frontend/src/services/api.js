@@ -39,4 +39,32 @@ export const resolveAlert = async (id) => {
   return data.data;
 };
 
+export const admitPatient = async (patientData) => {
+  const { data } = await apiClient.post('/patients', patientData);
+  return data.data;
+};
+
+export const ingestVitals = async (vitalsData) => {
+  const { data } = await apiClient.post('/data/vitals', vitalsData);
+  return data.data;
+};
+
+export const uploadMedicalDocument = async (patientId, file) => {
+  const formData = new FormData();
+  formData.append('patientId', patientId);
+  formData.append('document', file);
+
+  const { data } = await apiClient.post('/data/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data.data;
+};
+
+export const getMedicalDocuments = async (patientId) => {
+  const { data } = await apiClient.get(`/data/documents/${patientId}`);
+  return data.data;
+};
+
 export default apiClient;

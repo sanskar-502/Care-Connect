@@ -46,9 +46,10 @@ class PredictRiskResponse(BaseModel):
 
 class ExtractNoteRequest(BaseModel):
     """Input for clinical NLP extraction."""
+    patientId: str = Field(..., description="MongoDB ObjectId of the patient")
     rawText: str = Field(
         ...,
-        min_length=5,
+        min_length=1,
         description="Raw physician dictation text",
         examples=["Patient reports persistent fatigue. Increased Lasix to 40mg BID. Schedule follow-up in 3 days."],
     )
@@ -59,6 +60,7 @@ class ExtractNoteResponse(BaseModel):
     symptoms: List[str]
     medicationChanges: List[str]
     actions: List[str]
+    riskSignal: str = Field(default="neutral", description="Predicted clinical trajectory: positive, negative, or neutral.")
     embedding: List[float] = Field(
         default_factory=list,
         description="Vector embedding of the raw text (1536-dim)",
@@ -143,10 +145,15 @@ async def extract_note(request: ExtractNoteRequest):
         # --- Generate embedding for vector indexing ---
         embedding = generate_embedding(request.rawText)
 
+        # --- Save to ChromaDB ---
+        from services.chroma_service import add_record
+        add_record(request.patientId, request.rawText, embedding, "clinical_note")
+
         return ExtractNoteResponse(
             symptoms=extracted.get("symptoms", []),
             medicationChanges=extracted.get("medicationChanges", []),
             actions=extracted.get("actions", []),
+            riskSignal=extracted.get("riskSignal", "neutral"),
             embedding=embedding,
         )
     except Exception as e:

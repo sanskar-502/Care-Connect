@@ -8,7 +8,39 @@ const Patient = require('../models/Patient');
 const VitalsLog = require('../models/VitalsLog');
 const ClinicalNote = require('../models/ClinicalNote');
 const Alert = require('../models/Alert');
+const MedicalDocument = require('../models/MedicalDocument');
 const aiEngine = require('../services/aiEngineBridge');
+
+// --- Helper: Refresh AI Insights ---
+const refreshPatientInsights = async (patientId) => {
+  try {
+    const vitals = await VitalsLog.find({ patientId }).sort({ timestamp: -1 }).limit(10);
+    const notes = await ClinicalNote.find({ patientId }).sort({ timestamp: -1 }).limit(10);
+    const docs = await MedicalDocument.find({ patientId }).sort({ uploadDate: -1 }).limit(5);
+
+    const context = `
+Vitals: ${JSON.stringify(vitals)}
+Notes: ${JSON.stringify(notes)}
+Docs: ${JSON.stringify(docs)}
+    `;
+
+    const result = await aiEngine.generatePatientInsights(context);
+    
+    if (result && result.currentCondition) {
+      await Patient.findByIdAndUpdate(patientId, {
+        aiInsights: {
+          currentCondition: result.currentCondition,
+          risks: result.risks || [],
+          recommendations: result.recommendations || [],
+          lastUpdated: new Date()
+        }
+      });
+      console.log(`🧠 AI Insights refreshed for patient ${patientId}`);
+    }
+  } catch (error) {
+    console.error('Failed to refresh AI Insights:', error.message);
+  }
+};
 
 // ============================================================
 // 1. POST /api/data/vitals
@@ -92,6 +124,9 @@ const ingestVitals = async (req, res) => {
       newRiskScore: patient.currentRiskScore,
     });
 
+    // --- Step 7: Refresh AI Insights in background ---
+    refreshPatientInsights(patientId);
+
     // --- Return the summary to the mobile app ---
     res.json({
       success: true,
@@ -123,7 +158,7 @@ const processDictation = async (req, res) => {
     }
 
     // --- Step 1: Forward raw text to Python NLP pipeline ---
-    const extracted = await aiEngine.extractClinicalIntent(rawText);
+    const extracted = await aiEngine.extractClinicalIntent(patientId, rawText);
     console.log(`🎤 Dictation processed for ${patient.name}:`, extracted);
 
     // --- Step 2: Save the ClinicalNote to MongoDB ---
@@ -140,10 +175,30 @@ const processDictation = async (req, res) => {
 
       if (newMeds.length > 0) {
         patient.currentMedications.push(...newMeds);
-        await patient.save();
         console.log(`💊 New medications added for ${patient.name}:`, newMeds);
       }
     }
+
+    // --- Step 3.5: Dynamically adjust Risk Score based on AI's riskSignal ---
+    let riskModifier = 0;
+    const signal = extracted.riskSignal || "neutral";
+    
+    if (signal === "positive") {
+      riskModifier -= 15;
+    } else if (signal === "negative") {
+      riskModifier += 20;
+    }
+    
+    // Apply modifier and clamp to 0-100
+    if (riskModifier !== 0) {
+      patient.currentRiskScore = Math.max(0, Math.min(100, patient.currentRiskScore + riskModifier));
+      console.log(`🎯 Risk score adjusted by ${riskModifier} for ${patient.name}. New score: ${patient.currentRiskScore}`);
+    }
+
+    await patient.save();
+
+    // Refresh AI Insights in background
+    refreshPatientInsights(patientId);
 
     // --- Step 4: Fire Socket.io event so the React dashboard refreshes ---
     const io = req.app.get('io');
@@ -237,10 +292,78 @@ const getClinicalNotes = async (req, res) => {
   }
 };
 
+// ============================================================
+// 6. POST /api/data/upload
+//    Upload and process a medical document
+// ============================================================
+const uploadMedicalDocument = async (req, res) => {
+  try {
+    const { patientId } = req.body;
+    const file = req.file;
+
+    if (!patientId || !file) {
+      return res.status(400).json({ success: false, error: 'Patient ID and file are required' });
+    }
+
+    const patient = await Patient.findById(patientId);
+    if (!patient) {
+      return res.status(404).json({ success: false, error: 'Patient not found' });
+    }
+
+    // Convert buffer to base64
+    const fileBase64 = file.buffer.toString('base64');
+    const mimeType = file.mimetype;
+
+    // Send to Python AI Engine
+    const result = await aiEngine.processDocument(patientId, mimeType, fileBase64);
+
+    // Save metadata to MongoDB
+    const newDoc = await MedicalDocument.create({
+      patientId,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      extractedData: result.extracted,
+    });
+
+    // Also save as a ClinicalNote so RAG Copilot can easily search it via Vector DB fallback
+    await ClinicalNote.create({
+      patientId,
+      rawText: `[DOCUMENT: ${file.originalname}] ${result.rawText}`,
+      extractedIntent: result.extracted,
+    });
+
+    // Refresh AI Insights
+    refreshPatientInsights(patientId);
+
+    res.json({ success: true, data: newDoc });
+  } catch (error) {
+    console.error('Error uploading document:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to upload document' });
+  }
+};
+
+// ============================================================
+// 7. GET /api/data/documents/:patientId
+//    Fetch medical documents for a patient
+// ============================================================
+const getMedicalDocuments = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const documents = await MedicalDocument.find({ patientId }).sort({ uploadDate: -1 });
+    res.json({ success: true, count: documents.length, data: documents });
+  } catch (error) {
+    console.error('Error fetching medical documents:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch documents' });
+  }
+};
+
 module.exports = {
   ingestVitals,
   processDictation,
   askCopilot,
   getVitalsHistory,
   getClinicalNotes,
+  uploadMedicalDocument,
+  getMedicalDocuments,
+  refreshPatientInsights,
 };
